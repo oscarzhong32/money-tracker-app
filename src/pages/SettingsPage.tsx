@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
+import * as XLSX from 'xlsx';
 
 const SettingsPage: React.FC = () => {
   const [newCategory, setNewCategory] = useState('');
   const [categoryType, setCategoryType] = useState<'income' | 'expense'>('expense');
   const [cnyToMopRate, setCnyToMopRate] = useState('');
   const [mopToCnyRate, setMopToCnyRate] = useState('');
+  const [exportFormat, setExportFormat] = useState<'json' | 'excel'>('json');
 
   // 获取所有分类
   const categories = useLiveQuery(() => db.categories.toArray());
@@ -98,8 +100,8 @@ const SettingsPage: React.FC = () => {
     updateExchangeRate(fromCurrency, toCurrency, rate);
   };
 
-  // 导出数据
-  const exportData = async () => {
+  // 导出数据到JSON
+  const exportToJSON = async () => {
     try {
       const transactions = await db.transactions.toArray();
       const categories = await db.categories.toArray();
@@ -124,6 +126,64 @@ const SettingsPage: React.FC = () => {
     } catch (error) {
       console.error('导出数据失败:', error);
       alert('导出失败，请重试');
+    }
+  };
+
+  // 导出数据到Excel
+  const exportToExcel = async () => {
+    try {
+      const transactions = await db.transactions.toArray();
+      
+      // 准备Excel数据
+      const worksheetData = transactions.map(transaction => ({
+        '日期': new Date(transaction.date).toLocaleDateString('zh-CN'),
+        '类型': transaction.amount > 0 ? '收入' : '支出',
+        '分类': transaction.category,
+        '金额': Math.abs(transaction.amount),
+        '货币': transaction.currency,
+        '描述': transaction.description || ''
+      }));
+
+      // 创建工作簿和工作表
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 15 }, // 日期
+        { wch: 10 }, // 类型
+        { wch: 15 }, // 分类
+        { wch: 12 }, // 金额
+        { wch: 10 }, // 货币
+        { wch: 20 }  // 描述
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(workbook, worksheet, '交易记录');
+
+      // 生成Excel文件
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `money-tracker-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.click();
+      
+      alert('Excel导出成功！');
+    } catch (error) {
+      console.error('导出Excel失败:', error);
+      alert('导出失败，请重试');
+    }
+  };
+
+  // 导出数据（根据选择的格式）
+  const exportData = async () => {
+    if (exportFormat === 'json') {
+      await exportToJSON();
+    } else {
+      await exportToExcel();
     }
   };
 
@@ -302,6 +362,40 @@ const SettingsPage: React.FC = () => {
       {/* 数据备份与恢复 */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-medium mb-4">数据管理</h3>
+        
+        {/* 导出格式选择 */}
+        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">导出格式</h4>
+          <div className="flex space-x-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="exportFormat"
+                value="json"
+                checked={exportFormat === 'json'}
+                onChange={(e) => setExportFormat(e.target.value as 'json' | 'excel')}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">JSON格式</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="exportFormat"
+                value="excel"
+                checked={exportFormat === 'excel'}
+                onChange={(e) => setExportFormat(e.target.value as 'json' | 'excel')}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">Excel格式</span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            {exportFormat === 'json' 
+              ? 'JSON格式适合程序读取和备份，包含完整的数据结构'
+              : 'Excel格式适合人工查看和编辑，只包含交易记录'}
+          </p>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button

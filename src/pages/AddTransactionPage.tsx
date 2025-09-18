@@ -16,6 +16,9 @@ const AddTransactionPage: React.FC = () => {
   // 获取所有分类
   const categories = useLiveQuery(() => db.categories.toArray());
 
+  // 收入/支出切换
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
+
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +28,13 @@ const AddTransactionPage: React.FC = () => {
       return;
     }
 
+    // 根据交易类型自动处理金额正负
+    const amountValue = parseFloat(formData.amount);
+    const finalAmount = transactionType === 'income' ? Math.abs(amountValue) : -Math.abs(amountValue);
+
     try {
       await db.transactions.add({
-        amount: parseFloat(formData.amount),
+        amount: finalAmount,
         currency: formData.currency,
         category: formData.category,
         description: formData.description || '无描述',
@@ -58,9 +65,6 @@ const AddTransactionPage: React.FC = () => {
       [field]: value
     }));
   };
-
-  // 收入/支出切换
-  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
 
   // 根据类型过滤分类
   const filteredCategories = categories?.filter(cat => cat.type === transactionType);
@@ -185,12 +189,10 @@ const AddTransactionPage: React.FC = () => {
             <button
               key={amount}
               type="button"
-              onClick={() => handleInputChange('amount', 
-                transactionType === 'income' ? amount.toString() : (-amount).toString()
-              )}
+              onClick={() => handleInputChange('amount', amount.toString())}
               className="px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-100 text-sm"
             >
-              {transactionType === 'income' ? '+' : '-'}{amount}
+              {amount}
             </button>
           ))}
         </div>
