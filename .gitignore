@@ -1,23 +1,118 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Dependencies
+node_modules/
 /.pnp
 .pnp.js
 
-# testing
+# Testing
 /coverage
 
-# production
+# Production
 /build
 
-# misc
+# Misc
+>>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
 .DS_Store
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+<<<<<<< HEAD
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+=======
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+>>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
+=======
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+=======
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+
+# Misc
+>>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+<<<<<<< HEAD
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+=======
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+>>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
