@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "name": "money-tracker",
-=======
-  "name": "money-tracker-final",
->>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -15,7 +11,6 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
-<<<<<<< HEAD
     "chart.js": "^4.5.0",
     "dexie": "^4.2.0",
     "dexie-react-hooks": "^4.2.0",
@@ -23,12 +18,6 @@
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.1.1",
     "react-icons": "^5.5.0",
-=======
-    "dexie": "^4.2.0",
-    "dexie-react-hooks": "^4.2.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
->>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
     "react-router-dom": "^7.9.1",
     "react-scripts": "5.0.1",
     "typescript": "^4.9.5",
@@ -60,12 +49,9 @@
     ]
   },
   "devDependencies": {
-<<<<<<< HEAD
-    "@types/react-icons": "^2.2.7"
-=======
+    "@types/react-icons": "^2.2.7",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17"
->>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
   }
 }
