@@ -116,3 +116,4 @@ pids
 # Optional eslint cache
 .eslintcache
 >>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
+.vercel
