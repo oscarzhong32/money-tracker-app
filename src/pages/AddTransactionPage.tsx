@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,7 @@ const AddTransactionPage: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     amount: '',
-    currency: 'CNY' as 'CNY' | 'MOP',
+    currency: 'MOP' as 'CNY' | 'MOP',
     category: '',
     description: '',
     date: new Date().toISOString().split('T')[0]
@@ -18,6 +18,8 @@ const AddTransactionPage: React.FC = () => {
 
   // 收入/支出切换
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
+  
+
 
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,19 +34,26 @@ const AddTransactionPage: React.FC = () => {
     const amountValue = parseFloat(formData.amount);
     const finalAmount = transactionType === 'income' ? Math.abs(amountValue) : -Math.abs(amountValue);
 
+    // 保持原始货币，不进行转换
+    const finalCurrency = formData.currency;
+    const convertedAmount = finalAmount;
+    const exchangeRateUsed: number | undefined = undefined;
+
     try {
       await db.transactions.add({
-        amount: finalAmount,
-        currency: formData.currency,
+        type: transactionType,
+        amount: convertedAmount,
+        currency: finalCurrency,
         category: formData.category,
         description: formData.description || '无描述',
-        date: formData.date
+        date: formData.date,
+        exchangeRate: exchangeRateUsed
       });
 
       // 重置表单
       setFormData({
         amount: '',
-        currency: 'CNY',
+        currency: 'MOP',
         category: '',
         description: '',
         date: new Date().toISOString().split('T')[0]
@@ -138,7 +147,7 @@ const AddTransactionPage: React.FC = () => {
             <option value="">选择分类</option>
             {filteredCategories?.map((category) => (
               <option key={category.id} value={category.name}>
-                {category.name}
+                {category.icon} {category.name}
               </option>
             ))}
           </select>

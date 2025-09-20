@@ -1,58 +1,3 @@
-<<<<<<< HEAD
-/* 自定义样式 */
-.currency-mop {
-  color: #2563eb; /* 蓝色 */
-}
-
-.currency-cny {
-  color: #dc2626; /* 红色 */
-}
-
-/* 输入框聚焦时的样式 */
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-}
-
-/* 自定义滚动条 */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* 响应式调整 */
-@media (max-width: 640px) {
-  .hide-on-mobile {
-    display: none;
-  }
-}
-
-/* 动画效果 */
-.fade-in {
-  animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-=======
 .App {
   text-align: center;
 }
@@ -91,4 +36,3 @@ input:focus, select:focus, textarea:focus {
     transform: rotate(360deg);
   }
 }
->>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3

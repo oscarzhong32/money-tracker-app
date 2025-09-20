@@ -1,38 +1,240 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
-<<<<<<< HEAD
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-} from 'chart.js';
-import { Pie, Bar } from 'react-chartjs-2';
-
-// 注册Chart.js组件
-ChartJS.register(
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-);
+import Layout from '../components/Layout';
 
 const StatsPage: React.FC = () => {
   const [selectedCurrency, setSelectedCurrency] = useState<'MOP' | 'CNY'>('MOP');
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
+  const [monthlyExpenseData, setMonthlyExpenseData] = useState<Array<{ day: number; amount: number }>>([]);
   
-  // 获取交易数据
   const transactions = useLiveQuery(() => db.transactions.toArray());
+
+  // 获取本月每日支出数据（不分货币类型，自动转换汇率）
+  useEffect(() => {
+    const getMonthlyExpenseData = () => {
+      if (!transactions) return [];
+      
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // 创建本月所有天的数组
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const dailyData = Array.from({ length: daysInMonth }, (_, i) => ({
+        day: i + 1,
+        amount: 0
+      }));
+
+      // 汇率转换函数（简化的汇率）
+      const convertCurrency = (amount: number, fromCurrency: string, toCurrency: string) => {
+        if (fromCurrency === toCurrency) return amount;
+        
+        // 简化的汇率转换（实际应用中应该使用实时汇率API）
+        if (fromCurrency === 'CNY' && toCurrency === 'MOP') {
+          return amount * 1.13; // 人民币转澳门币
+        } else if (fromCurrency === 'MOP' && toCurrency === 'CNY') {
+          return amount * 0.88; // 澳门币转人民币
+        }
+        return amount;
+      };
+
+      // 填充每日支出数据（所有货币类型，自动转换）
+      transactions.forEach(transaction => {
+        const date = new Date(transaction.date);
+        
+        if (date.getMonth() === currentMonth && 
+            date.getFullYear() === currentYear &&
+            transaction.amount < 0) {
+          const day = date.getDate();
+          // 转换金额到选择的货币
+          const convertedAmount = convertCurrency(
+            Math.abs(transaction.amount),
+            transaction.currency,
+            selectedCurrency
+          );
+          dailyData[day - 1].amount += convertedAmount;
+        }
+      });
+
+      return dailyData;
+    };
+
+    const data = getMonthlyExpenseData();
+    setMonthlyExpenseData(data);
+  }, [transactions, selectedCurrency]);
+
+  // 智能柱状图组件 - 优化版
+  const BarChart: React.FC<{ data: Array<{ day: number; amount: number }> }> = ({ data }) => {
+    if (data.length === 0) {
+      return (
+        <div className="h-64 flex items-center justify-center text-gray-400 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8">
+          <div className="text-center">
+            <div className="text-4xl mb-4">📊</div>
+            <p className="text-lg font-medium mb-2">暂无支出数据</p>
+            <p className="text-sm text-gray-500">开始记账后，这里将显示您的支出趋势</p>
+          </div>
+        </div>
+      );
+    }
+
+    const hasData = data.some(d => d.amount > 0);
+    const now = new Date();
+    const currentDay = now.getDate();
+
+    if (!hasData) {
+      return (
+        <div className="h-64 flex items-center justify-center text-gray-400 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-8">
+          <div className="text-center">
+            <div className="text-4xl mb-4">💸</div>
+            <p className="text-lg font-medium mb-2">本月暂无支出</p>
+            <p className="text-sm text-gray-500">继续保持良好的消费习惯！</p>
+          </div>
+        </div>
+      );
+    }
+
+    // 智能计算最大金额 - 确保小金额也能有良好的可视化效果
+    const amounts = data.map(d => d.amount).filter(amount => amount > 0);
+    const maxAmount = Math.max(...amounts);
+    
+    // 简单直观的高度计算 - 确保金额与高度直接对应
+    const getAdjustedHeight = (amount: number) => {
+      if (amount === 0) return 10; // 最小基础高度（像素）
+      
+      // 使用固定比例：每10元对应10像素高度
+      // 20元 → 20像素，100元 → 100像素，1000元 → 200像素（最大限制）
+      const baseHeight = amount * 1; // 1:1比例
+      return Math.min(Math.max(baseHeight, 20), 200); // 最小20px，最大200px
+    };
+    
+
+    
+
+    
+
+
+    const totalAmount = data.reduce((sum, d) => sum + d.amount, 0);
+    const nonZeroDays = data.filter(d => d.amount > 0).length;
+    const averageAmount = nonZeroDays > 0 ? totalAmount / nonZeroDays : 0;
+
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        {/* 智能统计摘要 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+            <div className="text-2xl font-bold text-blue-700">{maxAmount.toFixed(0)}</div>
+            <div className="text-xs text-blue-600 font-medium">单日最高</div>
+          </div>
+          <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+            <div className="text-2xl font-bold text-green-700">{totalAmount.toFixed(0)}</div>
+            <div className="text-xs text-green-600 font-medium">本月总支</div>
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+            <div className="text-2xl font-bold text-purple-700">{averageAmount.toFixed(0)}</div>
+            <div className="text-xs text-purple-600 font-medium">日均支出</div>
+          </div>
+        </div>
+
+        {/* 交互式柱状图容器 */}
+        <div className="h-72 relative group">
+          {/* 动态网格背景 */}
+          <div className="absolute inset-0 grid grid-cols-7 gap-4 opacity-20">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="border-t border-blue-200" 
+                style={{ marginTop: `${(i + 1) * 20}%` }}></div>
+            ))}
+          </div>
+          
+          {/* 主要柱状图 */}
+          <div className="relative w-full h-full flex items-end justify-between px-3">
+            {data.map((d, i) => {
+              const adjustedHeight = getAdjustedHeight(d.amount);
+              const isToday = d.day === currentDay;
+              const isFuture = d.day > currentDay;
+              const isEmpty = d.amount === 0;
+              
+              return (
+                <div
+                  key={i}
+                  className="flex-1 mx-1 flex flex-col items-center justify-end group relative"
+                >
+                  {/* 金额标签 - 始终显示但更美观 */}
+                  {d.amount > 0 && (
+                    <div className="text-xs font-semibold text-gray-700 mb-2 px-2 py-1 bg-white rounded-full shadow-sm border border-gray-200">
+                      {d.amount.toFixed(0)}
+                    </div>
+                  )}
+                  
+                  {/* 智能柱状图柱子 */}
+                  <div
+                    className={`w-4/5 rounded-t-lg transition-all duration-700 ease-out cursor-pointer ${
+                      isToday 
+                        ? 'bg-gradient-to-b from-red-500 to-red-600 shadow-xl ring-2 ring-red-300' 
+                        : isFuture
+                        ? 'bg-gradient-to-b from-gray-200 to-gray-300 opacity-50'
+                        : isEmpty
+                        ? 'bg-gradient-to-b from-gray-100 to-gray-200 opacity-30'
+                        : 'bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 shadow-lg hover:shadow-xl'
+                    }`}
+                    style={{
+                      height: `${adjustedHeight}px`,
+                      minHeight: '16px'
+                    }}
+                    title={isFuture ? '未来日期' : isEmpty ? '无支出' : `${d.day}号: MOP ${d.amount.toFixed(2)}`}
+                  />
+                  
+                  {/* 日期标签 */}
+                  <div className={`text-xs font-semibold mt-3 px-2 py-1 rounded-full ${
+                    isToday 
+                      ? 'bg-red-100 text-red-700 ring-1 ring-red-300' 
+                      : isFuture
+                      ? 'text-gray-400 bg-gray-100'
+                      : 'text-gray-600 bg-gray-50'
+                  }`}>
+                    {d.day}
+                  </div>
+                  
+                  {/* 增强悬停提示 */}
+                  <div className="absolute -top-14 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 text-xs bg-gray-900 text-white px-3 py-2 rounded-lg shadow-2xl z-20 pointer-events-none">
+                    <div className="font-bold">{d.day}号</div>
+                    <div>{d.amount > 0 ? `MOP ${d.amount.toFixed(2)}` : '无支出'}</div>
+                    {isToday && <div className="text-red-300 text-xs mt-1">今天</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* 智能Y轴刻度 */}
+          <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-600 font-medium pr-3">
+            <span>{maxAmount.toFixed(0)}</span>
+            <span>{(maxAmount * 0.75).toFixed(0)}</span>
+            <span>{(maxAmount * 0.5).toFixed(0)}</span>
+            <span>{(maxAmount * 0.25).toFixed(0)}</span>
+            <span className="text-gray-400">0</span>
+          </div>
+        </div>
+        
+        {/* 交互式图例 */}
+        <div className="flex justify-center gap-4 mt-6 text-xs">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gradient-to-b from-blue-500 to-blue-600 rounded mr-2"></div>
+            <span className="text-gray-600">已支出</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gradient-to-b from-red-500 to-red-600 rounded mr-2"></div>
+            <span className="text-gray-600">今日</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gradient-to-b from-gray-200 to-gray-300 rounded mr-2"></div>
+            <span className="text-gray-600">未来日期</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
   
-  // 根据时间范围筛选交易
   const getFilteredTransactions = () => {
     if (!transactions) return [];
     
@@ -44,244 +246,121 @@ const StatsPage: React.FC = () => {
         startDate.setDate(now.getDate() - 7);
         break;
       case 'month':
-        startDate.setMonth(now.getMonth() - 1);
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1); // 本月第一天
         break;
       case 'year':
-        startDate.setFullYear(now.getFullYear() - 1);
+        startDate = new Date(now.getFullYear(), 0, 1); // 本年1月1日
         break;
     }
     
-    return transactions.filter(t => 
-      t.currency === selectedCurrency && 
-      new Date(t.date) >= startDate
-    );
+    return transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate.getTime() >= startDate.getTime() && 
+             transactionDate.getTime() <= now.getTime();
+    });
   };
   
-  // 按分类汇总数据
   const getCategoryData = () => {
     const filtered = getFilteredTransactions();
     const categoryMap = new Map<string, number>();
     
     filtered.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
+      );
       const currentAmount = categoryMap.get(transaction.category) || 0;
-      categoryMap.set(transaction.category, currentAmount + Math.abs(transaction.amount));
+      categoryMap.set(transaction.category, currentAmount + convertedAmount);
     });
     
-    return {
-      labels: Array.from(categoryMap.keys()),
-      datasets: [
-        {
-          data: Array.from(categoryMap.values()),
-          backgroundColor: [
-            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-            '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F45B69'
-          ],
-          borderWidth: 1
-        }
-      ]
-    };
+    return Array.from(categoryMap.entries())
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 8);
   };
   
-  // 按月份汇总数据
-  const getMonthlyData = () => {
-    const filtered = getFilteredTransactions();
-    const monthlyMap = new Map<string, number>();
-    
-    // 初始化最近12个月
-    const months = [];
-    for (let i = 0; i < 12; i++) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      months.unshift(monthKey);
-      monthlyMap.set(monthKey, 0);
-    }
-    
-    filtered.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      if (monthlyMap.has(monthKey)) {
-        const currentAmount = monthlyMap.get(monthKey) || 0;
-        monthlyMap.set(monthKey, currentAmount + transaction.amount);
-      }
-    });
-    
-    // 格式化月份标签
-    const formattedLabels = months.map(month => {
-      const [year, monthNum] = month.split('-');
-      return `${year}/${monthNum}`;
-    });
-    
-    return {
-      labels: formattedLabels,
-      datasets: [
-        {
-          label: selectedCurrency === 'MOP' ? '澳门币' : '人民币',
-          data: months.map(month => monthlyMap.get(month) || 0),
-          backgroundColor: 'rgba(54, 162, 235, 0.5)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1
-        }
-      ]
-    };
-  };
-  
-  // 计算总金额
   const calculateTotal = () => {
     const filtered = getFilteredTransactions();
-    return filtered.reduce((sum, transaction) => sum + transaction.amount, 0);
+    let total = 0;
+
+    filtered.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
+      );
+      
+      if (transaction.amount > 0) {
+        total += convertedAmount;
+      } else {
+        total -= convertedAmount;
+      }
+    });
+
+    return total;
   };
   
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">统计分析</h2>
-      
-      {/* 筛选器 */}
-      <div className="flex flex-wrap gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            货币
-          </label>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setSelectedCurrency('MOP')}
-              className={`px-3 py-1 rounded-md ${selectedCurrency === 'MOP' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              澳门币
-            </button>
-            <button 
-              onClick={() => setSelectedCurrency('CNY')}
-              className={`px-3 py-1 rounded-md ${selectedCurrency === 'CNY' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              人民币
-            </button>
-          </div>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            时间范围
-          </label>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setTimeRange('week')}
-              className={`px-3 py-1 rounded-md ${timeRange === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              一周
-            </button>
-            <button 
-              onClick={() => setTimeRange('month')}
-              className={`px-3 py-1 rounded-md ${timeRange === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              一月
-            </button>
-            <button 
-              onClick={() => setTimeRange('year')}
-              className={`px-3 py-1 rounded-md ${timeRange === 'year' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-            >
-              一年
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* 总金额摘要 */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h3 className="text-sm text-gray-500">
-          {timeRange === 'week' ? '本周' : timeRange === 'month' ? '本月' : '本年'}总金额
-        </h3>
-        <p className="text-2xl font-bold">
-          {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
-          {calculateTotal().toFixed(2)}
-        </p>
-      </div>
-      
-      {/* 图表 */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* 分类饼图 */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-medium mb-4">分类支出</h3>
-          <div className="h-64">
-            {transactions && transactions.length > 0 ? (
-              <Pie data={getCategoryData()} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                暂无数据
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* 月度柱状图 */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-medium mb-4">月度趋势</h3>
-          <div className="h-64">
-            {transactions && transactions.length > 0 ? (
-              <Bar 
-                data={getMonthlyData()} 
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      beginAtZero: true
-                    }
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                暂无数据
-              </div>
-            )}
-          </div>
-=======
+  // 汇率转换函数（简化的汇率）
+  const convertCurrency = (amount: number, fromCurrency: string, toCurrency: string) => {
+    if (fromCurrency === toCurrency) return amount;
+    
+    // 简化的汇率转换（实际应用中应该使用实时汇率API）
+    if (fromCurrency === 'CNY' && toCurrency === 'MOP') {
+      return amount * 1.13; // 人民币转澳门币
+    } else if (fromCurrency === 'MOP' && toCurrency === 'CNY') {
+      return amount * 0.88; // 澳门币转人民币
+    }
+    return amount;
+  };
 
-// 简单的CSS图表组件
-const BarChart: React.FC<{ data: Array<{ label: string; value: number; color: string }>; height?: number }> = ({ 
-  data, 
-  height = 200 
-}) => {
-  const maxValue = Math.max(...data.map(item => Math.abs(item.value)));
+  const getIncomeExpense = () => {
+    const filtered = getFilteredTransactions();
+    let income = 0;
+    let expense = 0;
+
+    filtered.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
+      );
+      
+      if (transaction.amount > 0) {
+        income += convertedAmount;
+      } else {
+        expense += convertedAmount;
+      }
+    });
+
+    return { income, expense };
+  };
   
-  return (
-    <div className="w-full" style={{ height: `${height}px` }}>
-      <div className="flex items-end h-full space-x-2">
-        {data.map((item, index) => (
-          <div key={index} className="flex-1 flex flex-col items-center">
-            <div
-              className="w-full rounded-t transition-all duration-300 hover:opacity-80"
-              style={{
-                height: `${(Math.abs(item.value) / maxValue) * 80}%`,
-                backgroundColor: item.color,
-                minHeight: '4px'
-              }}
-              title={`${item.label}: ${item.value.toFixed(2)}`}
-            />
-            <div className="text-xs text-gray-600 mt-1 truncate w-full text-center">
-              {item.label}
-            </div>
+  if (!transactions) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+        </div>
+      </Layout>
+    );
+  }
 
-const StatsPage: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
-  const [selectedCurrency, setSelectedCurrency] = useState<'CNY' | 'MOP'>('CNY');
-  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'trends'>('overview');
-  
-  const transactions = useLiveQuery(() => db.transactions.toArray());
+  const { income, expense } = getIncomeExpense();
+  const categoryData = getCategoryData();
+  const total = calculateTotal();
 
-  const calculateStats = () => {
-    if (!transactions) return null;
+  // 计算日均交易数
+  const calculateDailyAverage = (): number => {
+    const filteredTransactions = getFilteredTransactions();
+    if (filteredTransactions.length === 0) return 0;
     
     const now = new Date();
     let startDate: Date;
-    
-    switch (selectedPeriod) {
+
+    switch (timeRange) {
       case 'week':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -292,426 +371,285 @@ const StatsPage: React.FC = () => {
         startDate = new Date(now.getFullYear(), 0, 1);
         break;
       default:
-        startDate = new Date(0);
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
-    
-    const filteredTransactions = transactions.filter(
-      t => new Date(t.date) >= startDate
-    );
-    
-    // 按分类统计
-    const categoryStats = filteredTransactions.reduce((acc, transaction) => {
-      const category = transaction.category;
-      if (!acc[category]) {
-        acc[category] = { total: 0, count: 0, type: transaction.amount > 0 ? 'income' : 'expense' };
-      }
-      acc[category].total += transaction.amount;
-      acc[category].count += 1;
-      return acc;
-    }, {} as Record<string, { total: number; count: number; type: 'income' | 'expense' }>);
-    
-    // 按货币统计
-    const currencyStats = filteredTransactions.reduce((acc, transaction) => {
-      const currency = transaction.currency;
-      if (!acc[currency]) {
-        acc[currency] = 0;
-      }
-      acc[currency] += transaction.amount;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // 收入支出统计
-    const income = filteredTransactions
-      .filter(t => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-    
-    const expense = filteredTransactions
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-    
-    // 每日趋势
-    const dailyTrend = filteredTransactions.reduce((acc, transaction) => {
-      const date = new Date(transaction.date).toLocaleDateString();
-      if (!acc[date]) {
-        acc[date] = { income: 0, expense: 0, net: 0 };
-      }
-      if (transaction.amount > 0) {
-        acc[date].income += transaction.amount;
+
+    const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.round((filteredTransactions.length / daysDiff) * 10) / 10;
+  };
+
+  // 计算支出收入比
+  const calculateExpenseIncomeRatio = (): string => {
+    const filteredTransactions = getFilteredTransactions();
+    let totalExpense = 0;
+    let totalIncome = 0;
+
+    filteredTransactions.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
+      );
+      
+      if (transaction.amount < 0) {
+        totalExpense += convertedAmount;
       } else {
-        acc[date].expense += Math.abs(transaction.amount);
+        totalIncome += convertedAmount;
       }
-      acc[date].net += transaction.amount;
-      return acc;
-    }, {} as Record<string, { income: number; expense: number; net: number }>);
+    });
 
-    return {
-      totalTransactions: filteredTransactions.length,
-      income,
-      expense: Math.abs(expense),
-      net: income + expense,
-      categoryStats,
-      currencyStats,
-      dailyTrend,
-      filteredTransactions
-    };
-  };
-  
-  const stats = calculateStats();
-  
-  if (!transactions) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">加载交易数据中...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const getCategoryColor = (index: number, type: 'income' | 'expense') => {
-    const incomeColors = ['#10B981', '#059669', '#047857', '#065F46'];
-    const expenseColors = ['#EF4444', '#DC2626', '#B91C1C', '#991B1B'];
-    const colors = type === 'income' ? incomeColors : expenseColors;
-    return colors[index % colors.length];
+    if (totalIncome === 0) return totalExpense === 0 ? '0.00' : '∞';
+    const ratio = totalExpense / totalIncome;
+    return ratio.toFixed(2);
   };
 
-  const renderOverview = () => (
-    <div className="space-y-6">
-      {/* 关键指标卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl shadow-sm border border-green-200">
-          <div className="text-sm text-green-600 mb-2">总收入</div>
-          <div className="text-2xl font-bold text-green-800">
-            {selectedCurrency === 'CNY' ? '¥' : 'MOP'} {stats?.income.toFixed(2)}
-          </div>
-          <div className="text-xs text-green-600 mt-2">💰 积极增长</div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-xl shadow-sm border border-red-200">
-          <div className="text-sm text-red-600 mb-2">总支出</div>
-          <div className="text-2xl font-bold text-red-800">
-            {selectedCurrency === 'CNY' ? '¥' : 'MOP'} {stats?.expense.toFixed(2)}
-          </div>
-          <div className="text-xs text-red-600 mt-2">📉 消费分析</div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl shadow-sm border border-blue-200">
-          <div className="text-sm text-blue-600 mb-2">净收入</div>
-          <div className={`text-2xl font-bold ${stats && stats.net >= 0 ? 'text-blue-800' : 'text-red-800'}`}>
-            {selectedCurrency === 'CNY' ? '¥' : 'MOP'} {stats?.net?.toFixed(2) || '0.00'}
-          </div>
-          <div className="text-xs text-blue-600 mt-2">
-            {stats && stats.net >= 0 ? '📈 盈利中' : '📉 亏损中'}
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl shadow-sm border border-purple-200">
-          <div className="text-sm text-purple-600 mb-2">交易笔数</div>
-          <div className="text-2xl font-bold text-purple-800">{stats?.totalTransactions}</div>
-          <div className="text-xs text-purple-600 mt-2">📊 总交易量</div>
-        </div>
-      </div>
+  // 获取最大单笔交易金额
+  const getLargestTransaction = (): string => {
+    const filteredTransactions = getFilteredTransactions();
+    if (filteredTransactions.length === 0) return '0';
 
-      {/* 货币分布 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">货币分布</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-sm text-orange-600 mb-1">澳门币</div>
-              <div className="text-xl font-bold text-orange-800">
-                MOP {stats?.currencyStats.MOP?.toFixed(2) || '0.00'}
-              </div>
-            </div>
-            <div className="text-center p-4 bg-cyan-50 rounded-lg">
-              <div className="text-sm text-cyan-600 mb-1">人民币</div>
-              <div className="text-xl font-bold text-cyan-800">
-                ¥ {stats?.currencyStats.CNY?.toFixed(2) || '0.00'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 收支比例 */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">收支比例</h3>
-          {stats && stats.income + stats.expense > 0 && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-green-600">收入</span>
-                <span className="text-gray-600">{((stats.income / (stats.income + stats.expense)) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(stats.income / (stats.income + stats.expense)) * 100}%` }}
-                ></div>
-              </div>
-              
-              <div className="flex justify-between text-sm mt-3">
-                <span className="text-red-600">支出</span>
-                <span className="text-gray-600">{((stats.expense / (stats.income + stats.expense)) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-red-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(stats.expense / (stats.income + stats.expense)) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderCategories = () => {
-    if (!stats || Object.keys(stats.categoryStats).length === 0) {
-      return (
-        <div className="text-center py-12">
-          <div className="text-gray-400 text-6xl mb-4">📊</div>
-          <p className="text-gray-500">暂无分类数据</p>
-        </div>
+    let largest = 0;
+    filteredTransactions.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
       );
-    }
-
-    const incomeCategories = Object.entries(stats.categoryStats)
-      .filter(([_, data]) => data.type === 'income')
-      .sort(([, a], [, b]) => b.total - a.total);
-
-    const expenseCategories = Object.entries(stats.categoryStats)
-      .filter(([_, data]) => data.type === 'expense')
-      .sort(([, a], [, b]) => Math.abs(b.total) - Math.abs(a.total));
-
-    return (
-      <div className="space-y-8">
-        {/* 收入分类 */}
-        {incomeCategories.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">收入分类</h3>
-            <BarChart
-              data={incomeCategories.map(([label, data], index) => ({
-                label,
-                value: data.total,
-                color: getCategoryColor(index, 'income')
-              }))}
-              height={150}
-            />
-            <div className="mt-4 space-y-2">
-              {incomeCategories.map(([category, data], index) => (
-                <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <div
-                      className="w-3 h-3 rounded-full mr-3"
-                      style={{ backgroundColor: getCategoryColor(index, 'income') }}
-                    ></div>
-                    <span className="font-medium">{category}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-green-600 font-semibold">+{data.total.toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">{data.count} 笔交易</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 支出分类 */}
-        {expenseCategories.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">支出分类</h3>
-            <BarChart
-              data={expenseCategories.map(([label, data], index) => ({
-                label,
-                value: Math.abs(data.total),
-                color: getCategoryColor(index, 'expense')
-              }))}
-              height={150}
-            />
-            <div className="mt-4 space-y-2">
-              {expenseCategories.map(([category, data], index) => (
-                <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <div
-                      className="w-3 h-3 rounded-full mr-3"
-                      style={{ backgroundColor: getCategoryColor(index, 'expense') }}
-                    ></div>
-                    <span className="font-medium">{category}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-red-600 font-semibold">-{Math.abs(data.total).toFixed(2)}</div>
-                    <div className="text-xs text-gray-500">{data.count} 笔交易</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+      largest = Math.max(largest, convertedAmount);
+    });
+    
+    return largest.toFixed(2);
   };
 
-  const renderTrends = () => {
-    if (!stats || Object.keys(stats.dailyTrend).length === 0) {
-      return (
-        <div className="text-center py-12">
-          <div className="text-gray-400 text-6xl mb-4">📈</div>
-          <p className="text-gray-500">暂无趋势数据</p>
-        </div>
+  // 获取分类占比数据
+  const getCategoryPercentageData = (): [string, string, number][] => {
+    const filteredTransactions = getFilteredTransactions();
+    const expenseTransactions = filteredTransactions.filter(t => t.amount < 0);
+    
+    if (expenseTransactions.length === 0) return [];
+
+    const categoryTotals: Record<string, number> = {};
+    let totalExpense = 0;
+
+    expenseTransactions.forEach(transaction => {
+      const convertedAmount = convertCurrency(
+        Math.abs(transaction.amount),
+        transaction.currency,
+        selectedCurrency
       );
-    }
+      const category = transaction.category || '其他';
+      categoryTotals[category] = (categoryTotals[category] || 0) + convertedAmount;
+      totalExpense += convertedAmount;
+    });
 
-    const dailyData = Object.entries(stats.dailyTrend)
-      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-      .slice(-7); // 只显示最近7天
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">近期趋势</h3>
-          <div className="h-64">
-            <div className="flex items-end h-48 space-x-2">
-              {dailyData.map(([date, data], index) => (
-                <div key={date} className="flex-1 flex flex-col items-center">
-                  <div className="flex items-end justify-center space-x-1 mb-2">
-                    {/* 收入柱 */}
-                    <div
-                      className="w-3 bg-green-400 rounded-t transition-all duration-300 hover:bg-green-500"
-                      style={{ height: `${(data.income / Math.max(...dailyData.map(d => d[1].income))) * 80}%` }}
-                      title={`收入: ${data.income.toFixed(2)}`}
-                    />
-                    {/* 支出柱 */}
-                    <div
-                      className="w-3 bg-red-400 rounded-t transition-all duration-300 hover:bg-red-500"
-                      style={{ height: `${(data.expense / Math.max(...dailyData.map(d => d[1].expense))) * 80}%` }}
-                      title={`支出: ${data.expense.toFixed(2)}`}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-600 mt-2">
-                    {new Date(date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* 图例 */}
-            <div className="flex justify-center space-x-4 mt-4">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-400 rounded mr-2"></div>
-                <span className="text-xs text-gray-600">收入</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-400 rounded mr-2"></div>
-                <span className="text-xs text-gray-600">支出</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 详细日数据 */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">每日明细</h3>
-          <div className="space-y-3">
-            {dailyData.map(([date, data]) => (
-              <div key={date} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="font-medium">
-                  {new Date(date).toLocaleDateString('zh-CN', { 
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </span>
-                <div className="text-right">
-                  <div className="text-sm">
-                    <span className="text-green-600">+{data.income.toFixed(2)}</span>
-                    {' • '}
-                    <span className="text-red-600">-{data.expense.toFixed(2)}</span>
-                  </div>
-                  <div className={`text-xs ${data.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    净: {data.net >= 0 ? '+' : ''}{data.net.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return Object.entries(categoryTotals)
+      .sort(([, a], [, b]) => b - a)
+      .map(([category, amount]) => [
+        category,
+        ((amount / totalExpense) * 100).toFixed(1),
+        amount
+      ] as [string, string, number])
+      .slice(0, 5); // 只显示前5个分类
   };
+
+
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* 头部 */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <h1 className="text-2xl font-bold text-gray-800">财务统计</h1>
-            
-            <div className="flex flex-wrap gap-4">
-              <select
-                value={selectedCurrency}
-                onChange={(e) => setSelectedCurrency(e.target.value as 'CNY' | 'MOP')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="CNY">人民币 (¥)</option>
-                <option value="MOP">澳门币 (MOP)</option>
-              </select>
-              
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value as 'week' | 'month' | 'year')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="week">本周</option>
-                <option value="month">本月</option>
-                <option value="year">今年</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 标签导航 */}
-          <div className="flex space-x-1 mt-6 p-1 bg-gray-100 rounded-lg">
-            {[
-              { id: 'overview' as const, label: '概览', icon: '📊' },
-              { id: 'categories' as const, label: '分类', icon: '🗂️' },
-              { id: 'trends' as const, label: '趋势', icon: '📈' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center px-4 py-2 rounded-md transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
+    <Layout>
+      <div className="max-w-6xl mx-auto p-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8">统计分析</h1>
+        
+        {/* 筛选器 */}
+        <div className="flex flex-wrap gap-6 mb-8">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">货币</label>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setSelectedCurrency('MOP')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedCurrency === 'MOP' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
+                澳门币
               </button>
+              <button 
+                onClick={() => setSelectedCurrency('CNY')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedCurrency === 'CNY' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                人民币
+              </button>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">时间范围</label>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setTimeRange('week')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  timeRange === 'week' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                本周
+              </button>
+              <button 
+                onClick={() => setTimeRange('month')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  timeRange === 'month' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                本月
+              </button>
+              <button 
+                onClick={() => setTimeRange('year')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  timeRange === 'year' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                本年
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="text-sm text-gray-600 mb-2">总收入</div>
+            <div className="text-2xl font-bold text-green-600">
+              {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
+              {income.toFixed(2)}
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="text-sm text-gray-600 mb-2">总支出</div>
+            <div className="text-2xl font-bold text-red-600">
+              {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
+              {expense.toFixed(2)}
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="text-sm text-gray-600 mb-2">净收入</div>
+            <div className={`text-2xl font-bold ${total >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
+              {total.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        {/* 分类统计 */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">分类统计</h2>
+          <div className="space-y-4">
+            {categoryData.map(([category, amount], index) => (
+              <div key={category} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-3"></div>
+                  <span className="font-medium">{category}</span>
+                </div>
+                <div className="text-lg font-semibold">
+                  {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
+                  {amount.toFixed(2)}
+                </div>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* 内容区域 */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'categories' && renderCategories()}
-          {activeTab === 'trends' && renderTrends()}
+        {/* 本月支出趋势图 */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">本月支出趋势</h2>
+          {/* 滑动容器 - 防止柱状图在移动设备上超出界面 */}
+          <div className="overflow-x-auto">
+            <div className="min-w-max">
+              <BarChart data={monthlyExpenseData} />
+            </div>
+          </div>
+          <div className="mt-3 text-center text-sm text-gray-500">
+            每日支出趋势 ({selectedCurrency === 'CNY' ? '¥' : 'MOP'})
+          </div>
         </div>
 
-        {/* 底部统计信息 */}
-        <div className="bg-white rounded-xl shadow-sm p-6 text-center">
-          <p className="text-sm text-gray-500">
-            统计时间段: {selectedPeriod === 'week' ? '最近7天' : selectedPeriod === 'month' ? '本月' : '今年'} • 
-            共 {stats?.totalTransactions} 笔交易 • 
-            最后更新: {new Date().toLocaleString('zh-CN')}
-          </p>
->>>>>>> 242aa4e8d8cc742b6d1fa73f61ab1631a824e3a3
+        {/* 增强版交易统计 */}
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">📈 交易深度分析</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {/* 交易笔数统计 */}
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+              <div className="text-3xl font-bold text-blue-700">{getFilteredTransactions().length}</div>
+              <div className="text-sm text-blue-600 font-medium">总交易笔数</div>
+              <div className="text-xs text-blue-500 mt-1">
+                {timeRange === 'week' ? '本周' : timeRange === 'month' ? '本月' : '本年'}
+              </div>
+            </div>
+
+            {/* 日均交易数 */}
+            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+              <div className="text-3xl font-bold text-green-700">
+                {calculateDailyAverage()}
+              </div>
+              <div className="text-sm text-green-600 font-medium">日均交易</div>
+              <div className="text-xs text-green-500 mt-1">笔/天</div>
+            </div>
+
+            {/* 支出收入比 */}
+            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+              <div className="text-3xl font-bold text-purple-700">
+                {calculateExpenseIncomeRatio()}
+              </div>
+              <div className="text-sm text-purple-600 font-medium">收支比</div>
+              <div className="text-xs text-purple-500 mt-1">支出/收入</div>
+            </div>
+
+            {/* 最大单笔交易 */}
+            <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+              <div className="text-3xl font-bold text-orange-700">
+                {getLargestTransaction()}
+              </div>
+              <div className="text-sm text-orange-600 font-medium">最大交易</div>
+              <div className="text-xs text-orange-500 mt-1">{selectedCurrency === 'MOP' ? 'MOP' : '¥'}</div>
+            </div>
+          </div>
+
+          {/* 分类占比分析 */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">🏷️ 支出分类占比</h3>
+            <div className="space-y-3">
+              {getCategoryPercentageData().map(([category, percentage, amount], index) => (
+                <div key={category} className="flex items-center justify-between">
+                  <div className="flex items-center flex-1">
+                    <div className="w-4 h-4 rounded-full bg-blue-500 mr-3"></div>
+                    <span className="font-medium text-gray-700 text-sm">{category}</span>
+                    <span className="text-xs text-gray-500 ml-2">{percentage}%</span>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-800">
+                    {selectedCurrency === 'MOP' ? 'MOP ' : '¥ '}
+                    {amount.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>数据库测试</title>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <script>
+        // 复制db.ts中的数据库定义
+        const db = new Dexie('MoneyTrackerDB');
+        db.version(1).stores({
+            transactions: '++id, date, amount, currency, category, description',
+            categories: '++id, name, type, icon, color'
+        });
+
+        async function testDatabase() {
+            try {
+                const transactions = await db.transactions.toArray();
+                console.log('数据库中的交易记录:', transactions);
+                console.log('记录数量:', transactions.length);
+                
+                const output = document.getElementById('output');
+                output.innerHTML = `
+                    <h3>数据库测试结果</h3>
+                    <p>交易记录数量: ${transactions.length}</p>
+                    <pre>${JSON.stringify(transactions, null, 2)}</pre>
+                `;
+
+                // 检查9月份的支出记录
+                const septemberExpenses = transactions.filter(t => {
+                    const date = new Date(t.date);
+                    return date.getMonth() === 8 && // 9月（0-based）
+                           date.getFullYear() === 2025 &&
+                           t.amount < 0;
+                });
+                
+                console.log('9月份支出记录:', septemberExpenses);
+                
+            } catch (error) {
+                console.error('数据库查询错误:', error);
+                document.getElementById('output').innerHTML = `
+                    <h3>错误</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+
+        // 页面加载时运行测试
+        window.onload = testDatabase;
+    </script>
+</head>
+<body>
+    <h1>数据库连接测试</h1>
+    <div id="output">正在连接数据库...</div>
+</body>
+</html>
